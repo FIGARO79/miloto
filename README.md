@@ -38,11 +38,47 @@ En Windows:
 actualizar.bat
 ```
 
+### 3. Análisis Estadístico y Generación de Pronósticos
+Para ejecutar el análisis multivariable y obtener las 10 combinaciones con mayor probabilidad histórica:
+
+En Linux / WSL:
+```bash
+./ejecutar_miloto.sh
+```
+
+En Windows:
+```cmd
+ejecutar_miloto.bat
+```
+
 ---
 
 ## 🛠️ Herramientas Disponibles
 
-### 🔄 1. Web Scraper (`actualizar_resultados.py`)
+### 🧠 1. Motor Estadístico y Predictivo (`miloto.py`)
+Implementa análisis probabilístico y multivariable adaptado al espacio muestral de MiLoto ($\binom{39}{5} = 575.757$ combinaciones):
+* **Frecuencias y Chi-cuadrado ($\chi^2$):** Prueba de bondad de ajuste para uniformidad e hipótesis de aleatoriedad.
+* **Números Calientes y Fríos:** Frecuencias en ventanas de 50 sorteos y análisis de atrasos (gaps actuales y máximos).
+* **Distribución de Sumas (Gaussiana):** Contraste frente a la media teórica ($\mu = 100, \sigma \approx 23.8$).
+* **Balance de Paridad y Rango:** Monitoreo de ratios Par/Impar y Bajo/Alto (1-19 vs 20-39).
+* **Cadenas de Markov y Entropía de Shannon:** Probabilidad de transición secuencial y dispersión informacional.
+* **Composite Score:** Algoritmo ponderado (0 a 100) para ranking de combinaciones.
+* **Evaluación de Jugadas Manuales:**
+  ```bash
+  ./.venv/bin/python miloto.py --evaluar 7 8 18 38 39
+  ```
+* **Ruedas Combinatorias (Wheeling System):**
+  ```bash
+  ./.venv/bin/python miloto.py --rueda 4 7 11 18 25 31 38 --garantia 3
+  ```
+* **Salida JSON para APIs o Frontends:**
+  ```bash
+  ./.venv/bin/python miloto.py --json
+  ```
+
+---
+
+### 🔄 2. Web Scraper (`actualizar_resultados.py`)
 Consulta el portal oficial de Baloto (con soporte de paginación de la página 1 a la 62 y fuente de contingencia automática QueCayo para garantizar que no existan sorteos omitidos).
 
 * **Modo Interactivo (reciente):**
