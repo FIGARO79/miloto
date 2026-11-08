@@ -194,13 +194,13 @@ def main():
     a_str = "-".join(f"{x:02d}" for x in comb_perfil_a)
     b_str = "-".join(f"{x:02d}" for x in comb_perfil_b)
 
-    print("#### 🟢 Tiquete 1 — Perfil A (Momentum & Equilibrio Central):")
+    print("#### 🟢 Tiquete 1 — Perfil A (🎯 PERFIL PRINCIPAL RECOMENDADO - MÁXIMA PROBABILIDAD ESTOCÁSTICA):")
     print(f"* **Jugada:** `{a_str}` (Score: **{top_1['composite']}**/100, Suma: {top_1['suma']}, {top_1['paridad']})")
-    print("  *Enfocado en balotas calientes con alta co-ocurrencia de Ising y suma centrada en 100.*\n")
+    print("  *Enfocado en balotas calientes con alta densidad de frecuencia acumulada y suma centrada en el rango dorado (100).*\n")
 
-    print("#### 🔴 Tiquete 2 — Perfil B (Cazador de Ruptura por Atraso Extremo):")
+    print("#### 🔴 Tiquete 2 — Perfil B (Alternativa Táctica de Alto Riesgo - Cazador de Ruptura):")
     print(f"* **Jugada:** `{b_str}` (Suma: {eval_perfil_b['suma']}, {eval_perfil_b['paridad']}, Atraso Promedio: {eval_perfil_b['atraso_promedio']} sorteos)")
-    print("  *Enfocado en números fríos de alta madurez Weibull listos para retornar a la media histórica, sin repetir ninguna balota del Tiquete 1.*\n")
+    print("  *Enfocado en números fríos de alto retraso sin repetir ninguna balota del Tiquete 1 (búsqueda de reversión a la media).*\n")
 
     print("📌 **Presupuesto Sugerido:** 4 sorteos semanales x $8.000 COP = **$32.000 COP por semana**.")
     print("==========================================================================")

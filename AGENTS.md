@@ -27,8 +27,8 @@ Cuando el usuario ingrese la palabra activadora o solicite jugadas/pronósticos 
    * **2. Auditoría Detallada de la Jugada Estrella (#1):** Desglose cualitativo a fondo del Top 1 (Suma Gaussiana, Entropía de Shannon, Bayes Dirichlet, Hazard Rate y Afinidad de Ising).
    * **3. Estrategia Avanzada: Rueda Combinatoria Reducida (Wheeling System):** Bloque de 7 números clave sincronizados con garantía matemática de 3 aciertos en 5 tiquetes ($20.000 COP).
    * **4. Asesoría Financiera: Estrategia de 2 Tiquetes ($8.000 COP Total):**
-     * **Perfil A (Momentum & Equilibrio Central):** Jugada Top #1 orientada a alta frecuencia y suma en rango dorado (~100).
-     * **Perfil B (Cazador de Ruptura por Atraso Extremo):** Jugada con las 5 balotas de mayor retraso histórico sin solapar ninguna del Perfil A.
+     * **Perfil A (🎯 Recomendado Principal - Máxima Probabilidad):** Jugada Top #1 orientada a alta frecuencia empírica (75% peso JAX/Frecuencias) y suma en rango dorado (~100).
+     * **Perfil B (Alternativa de Ruptura por Atraso Extremo):** Jugada con las 5 balotas de mayor retraso histórico sin solapar ninguna del Perfil A.
      * **Presupuesto semanal:** $32.000 COP por semana (4 sorteos semanales: Lunes, Martes, Jueves y Viernes).
 4. **Idioma:** Todas las respuestas y análisis deben entregarse en español.
 

@@ -271,15 +271,9 @@ def calculate_composite_score(
     score_ising=0.5,
 ):
     """
-    Índice Predictivo Compuesto Global Refinado v3 (Composite Score 0 a 100).
-    Integra armónicamente los 7 motores matemáticos de GanaBaloto:
-    - 20% Frecuencia observada
-    - 15% Cadenas de Markov (Global y Posicional)
-    - 15% Campana de Gauss (Alineación con la media teórica 100)
-    - 15% Modelo Bayesiano Dirichlet-Multinomial
-    - 15% Modelo de Supervivencia y Desgaste de Weibull
-    - 10% Afinidad de Acoplamiento de Ising
-    - 10% Entropía Informacional de Shannon
+    Índice Predictivo Compuesto Global Refinado v4 (Composite Score 0 a 100).
+    Prioriza fuertemente la probabilidad empírica real (Frecuencia 55% + Markov 20% = 75%)
+    para evitar sobre-ajuste y mantener la señal estocástica genuina del bombo.
     """
     norm_freq = min(1.0, score_freq / 0.18)
     norm_markov_g = min(1.0, prob_markov_global * 1e4)
@@ -287,13 +281,12 @@ def calculate_composite_score(
     markov_combined = 0.5 * norm_markov_g + 0.5 * norm_markov_p
 
     composite = (
-        0.20 * norm_freq
-        + 0.15 * markov_combined
-        + 0.15 * score_gauss
-        + 0.15 * score_bayes
-        + 0.15 * score_hazard
-        + 0.10 * score_ising
-        + 0.10 * score_entropy
+        0.55 * norm_freq
+        + 0.20 * markov_combined
+        + 0.10 * score_gauss
+        + 0.05 * score_bayes
+        + 0.05 * score_hazard
+        + 0.05 * score_entropy
     ) * 100.0
 
     return round(max(0.0, min(100.0, composite)), 2)
@@ -516,15 +509,12 @@ def generar_combinaciones_probables(num_combinations, results):
     atrasos = results["atrasos_dict"]
     N_draws = results["total_draws"]
 
-    # Vector de pesos heurísticos de entrada para muestreo
+    # Vector de pesos estocásticos de entrada para muestreo
     weights = np.zeros(N_BALLS + 1)
     for n in range(1, N_BALLS + 1):
         f = counts.get(n, 1) / max(counts.values())
         h_boost = 1.35 if n in hot else 1.0
-        gap = atrasos.get(n, 0)
-        # Ventana de madurez de Weibull (gaps entre 4 y 14)
-        g_boost = 1.3 if 4 <= gap <= 14 else 0.85
-        weights[n] = f * h_boost * g_boost
+        weights[n] = f * h_boost
 
     p_norm = weights[1:] / weights[1:].sum()
 
