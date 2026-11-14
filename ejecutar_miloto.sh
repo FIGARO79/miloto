@@ -34,7 +34,13 @@ if [ ! -d "$VENV_DIR" ]; then
 fi
 
 source "$VENV_DIR/bin/activate"
-"$VENV_DIR/bin/python" miloto.py "$@"
+if [ $# -eq 0 ]; then
+    "$VENV_DIR/bin/python" miloto.py
+    echo ""
+    "$VENV_DIR/bin/python" .agents/skills/miloto-analisis-predictivo/scripts/ejecutar_pronostico_completo.py
+else
+    "$VENV_DIR/bin/python" miloto.py "$@"
+fi
 
 if [ -t 0 ] && [[ ! "$*" =~ "--json" ]]; then
     echo ""

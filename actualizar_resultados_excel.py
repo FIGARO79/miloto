@@ -32,7 +32,16 @@ def generar_excel(json_path=JSON_FILE, excel_path=EXCEL_FILE):
 
         df = pd.DataFrame(sorteos)
         # Ordenar columnas
-        cols_orden = ["Sorteo", "Fecha", "B1", "B2", "B3", "B4", "B5"]
+        cols_orden = [
+            "Sorteo",
+            "Fecha",
+            "B1",
+            "B2",
+            "B3",
+            "B4",
+            "B5",
+            "Monto_Ganado",
+        ]
         cols_presentes = [c for c in cols_orden if c in df.columns]
         df = df[cols_presentes]
 

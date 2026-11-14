@@ -24,7 +24,7 @@ import math
 import json
 import argparse
 from datetime import datetime
-from collections import defaultdict
+from collections import Counter, defaultdict
 from itertools import combinations
 
 # --- Configuración de Hardware ---
@@ -492,7 +492,328 @@ def analizar_miloto(df):
         bayes_lookup[num] = (cnt + 1.0) / denom_main
     res["bayes_lookup"] = bayes_lookup
 
+    # 11. Análisis de Ciclo de Premio Mayor (5 balotas) y Patrón de Sorteos
+    res["jackpot_analysis"] = analizar_patrones_premio_mayor(df)
+    res["jackpot_play"] = generar_jugada_patron_premio_mayor(res)
+
     return res
+
+
+def analizar_patrones_premio_mayor(df):
+    """Analiza la relación de números de sorteo, saltos (delta), módulo 4, arrastre y balotas de los ganadores de 5 balotas."""
+    if "Monto_Ganado" not in df.columns or df.empty:
+        return {"disponible": False}
+
+    work = df.sort_values("Sorteo").reset_index(drop=True).copy()
+    work["monto_num"] = (
+        work["Monto_Ganado"]
+        .fillna("$0")
+        .astype(str)
+        .str.replace(r"[\$\.]", "", regex=True)
+    )
+    work["monto_num"] = pd.to_numeric(work["monto_num"], errors="coerce").fillna(0).astype(int)
+    work["gano"] = work["monto_num"] > 0
+
+    w = work[work["gano"]].copy().reset_index(drop=True)
+    if w.empty:
+        return {"disponible": False}
+
+    w["delta_sorteos"] = w["Sorteo"].diff()
+    deltas = w["delta_sorteos"].dropna().astype(int)
+
+    total_sorteos = int(len(work))
+    total_ganadores = int(len(w))
+    efectividad_pct = round(float(total_ganadores / total_sorteos * 100), 2)
+
+    delta_media = round(float(deltas.mean()), 2) if not deltas.empty else 0.0
+    delta_mediana = round(float(deltas.median()), 1) if not deltas.empty else 0.0
+    delta_max = int(deltas.max()) if not deltas.empty else 0
+
+    corr_delta_monto = 0.0
+    if len(deltas) > 1:
+        corr_val = deltas.corr(w["monto_num"].iloc[1:])
+        if pd.notna(corr_val):
+            corr_delta_monto = round(float(corr_val), 4)
+
+    last_w = w.iloc[-1]
+    ultimo_ganador = {
+        "sorteo": int(last_w["Sorteo"]),
+        "fecha": str(last_w["Fecha"]),
+        "monto": str(last_w["Monto_Ganado"]),
+        "monto_num": int(last_w["monto_num"]),
+        "combinacion": sorted(int(last_w[c]) for c in COLUMNS),
+    }
+
+    last_sorteo = int(work["Sorteo"].iloc[-1])
+    next_sorteo = last_sorteo + 1
+    delta_actual = next_sorteo - ultimo_ganador["sorteo"]
+
+    if delta_actual <= 3:
+        tramo_key = "bajo"
+        tramo_label = "Bajo (Δ ≤ 3 sorteos)"
+    elif delta_actual <= 9:
+        tramo_key = "medio"
+        tramo_label = "Medio (4 ≤ Δ ≤ 9 sorteos)"
+    else:
+        tramo_key = "alto"
+        tramo_label = "Alto (Δ ≥ 10 sorteos)"
+
+    # Módulo 4 del número de sorteo (equivalencia exacta con días de sorteo)
+    dias_es = {
+        "Monday": "Lunes",
+        "Tuesday": "Martes",
+        "Wednesday": "Miércoles",
+        "Thursday": "Jueves",
+        "Friday": "Viernes",
+        "Saturday": "Sábado",
+        "Sunday": "Domingo",
+    }
+    dias_default = {0: "Jueves", 1: "Viernes", 2: "Lunes", 3: "Martes"}
+    work["dia_es"] = pd.to_datetime(work["Fecha"], errors="coerce").dt.day_name().map(dias_es)
+
+    mod4_stats = {}
+    for rem in (0, 1, 2, 3):
+        sub_m = work[work["Sorteo"] % 4 == rem]
+        tot_m = int(len(sub_m))
+        gan_m = int(sub_m["gano"].sum())
+        dia_m = (
+            str(sub_m["dia_es"].mode().iloc[0])
+            if not sub_m["dia_es"].dropna().empty
+            else dias_default[rem]
+        )
+        mod4_stats[rem] = {
+            "residuo": rem,
+            "dia": dia_m,
+            "sorteos": tot_m,
+            "ganadores": gan_m,
+            "tasa_pct": round(float(gan_m / tot_m * 100), 2) if tot_m else 0.0,
+        }
+
+    next_mod4 = next_sorteo % 4
+    proximo_mod4 = mod4_stats[next_mod4]
+
+    # Efecto Réplica tras premios grandes (>= $500M)
+    w["next_delta"] = w["delta_sorteos"].shift(-1)
+    grandes_hist = w[(w["monto_num"] >= 500_000_000) & w["next_delta"].notna()]
+    tasa_replica_pct = (
+        round(float((grandes_hist["next_delta"] <= 5).mean() * 100), 1)
+        if not grandes_hist.empty
+        else 0.0
+    )
+
+    replica_activo = False
+    replica_detalle = "Inactivo (último premio ≥ $500M fuera de ventana de 5 sorteos)"
+    if ultimo_ganador["monto_num"] >= 500_000_000 and delta_actual <= 5:
+        replica_activo = True
+        replica_detalle = (
+            f"Activo (premio ≥ $500M en #{ultimo_ganador['sorteo']}, "
+            f"a Δ={delta_actual} sorteos; tasa histórica ≤5 sorteos: {tasa_replica_pct}%)"
+        )
+    elif len(w) >= 2:
+        penult = w.iloc[-2]
+        penult_delta_next = next_sorteo - int(penult["Sorteo"])
+        if int(penult["monto_num"]) >= 500_000_000 and penult_delta_next <= 5:
+            replica_activo = True
+            replica_detalle = (
+                f"Réplica reciente (premio ≥ $500M en #{int(penult['Sorteo'])} hace {penult_delta_next} sorteos; "
+                f"ya cayó una réplica en #{ultimo_ganador['sorteo']})"
+            )
+
+    # Arrastre de balotas entre sorteos ganadores consecutivos
+    overlaps = []
+    for i in range(1, len(w)):
+        prev_balls = {int(w.iloc[i - 1][c]) for c in COLUMNS}
+        curr_balls = {int(w.iloc[i][c]) for c in COLUMNS}
+        overlaps.append(len(prev_balls & curr_balls))
+    arrastre_pct = round(float(np.mean([ov >= 1 for ov in overlaps]) * 100), 1) if overlaps else 0.0
+    arrastre_media = round(float(np.mean(overlaps)), 3) if overlaps else 0.0
+
+    # Balotas más frecuentes en ganadores (global y por tramo)
+    freq_global = Counter(int(x) for x in w[COLUMNS].values.flatten())
+    top_balotas_global = [
+        {"balota": int(b), "frecuencia": int(c)}
+        for b, c in freq_global.most_common(10)
+    ]
+
+    w_tramo = w.dropna(subset=["delta_sorteos"]).copy()
+    if tramo_key == "bajo":
+        sub_tramo = w_tramo[w_tramo["delta_sorteos"] <= 3]
+    elif tramo_key == "medio":
+        sub_tramo = w_tramo[(w_tramo["delta_sorteos"] >= 4) & (w_tramo["delta_sorteos"] <= 9)]
+    else:
+        sub_tramo = w_tramo[w_tramo["delta_sorteos"] >= 10]
+
+    if sub_tramo.empty:
+        sub_tramo = w
+
+    freq_tramo = Counter(int(x) for x in sub_tramo[COLUMNS].values.flatten())
+    top_balotas_tramo = [
+        {"balota": int(b), "frecuencia": int(c)}
+        for b, c in freq_tramo.most_common(10)
+    ]
+
+    ultimos_ganadores = []
+    for _, row in w.tail(8).iterrows():
+        d_val = row["delta_sorteos"]
+        ultimos_ganadores.append({
+            "sorteo": int(row["Sorteo"]),
+            "fecha": str(row["Fecha"]),
+            "delta_sorteos": int(d_val) if pd.notna(d_val) else None,
+            "combinacion": sorted(int(row[c]) for c in COLUMNS),
+            "monto": str(row["Monto_Ganado"]),
+        })
+
+    return {
+        "disponible": True,
+        "total_sorteos": total_sorteos,
+        "total_ganadores": total_ganadores,
+        "efectividad_pct": efectividad_pct,
+        "delta_media": delta_media,
+        "delta_mediana": delta_mediana,
+        "delta_max": delta_max,
+        "corr_delta_monto": corr_delta_monto,
+        "ultimo_ganador": ultimo_ganador,
+        "proximo_sorteo": next_sorteo,
+        "delta_actual": delta_actual,
+        "tramo_actual": tramo_key,
+        "tramo_actual_label": tramo_label,
+        "proximo_mod4": proximo_mod4,
+        "mod4_stats": {str(k): v for k, v in mod4_stats.items()},
+        "efecto_replica_activo": replica_activo,
+        "efecto_replica_tasa_pct": tasa_replica_pct,
+        "efecto_replica_detalle": replica_detalle,
+        "arrastre_pct": arrastre_pct,
+        "arrastre_media": arrastre_media,
+        "top_balotas_global": top_balotas_global,
+        "top_balotas_tramo": top_balotas_tramo,
+        "frecuencias_global": {int(k): int(v) for k, v in freq_global.items()},
+        "frecuencias_tramo": {int(k): int(v) for k, v in freq_tramo.items()},
+        "ultimos_ganadores": ultimos_ganadores,
+    }
+
+
+def generar_jugada_patron_premio_mayor(results):
+    """
+    Construye una jugada optimizada según el patrón empírico de ganadores del Premio Mayor:
+    - Incluye 1 o 2 balotas de arrastre del último ganador de 5 balotas.
+    - Prioriza frecuencias en ganadores del tramo actual y Composite Score v3.
+    - Filtra por suma en [82, 104], al menos 4 balotas <= 31 y paridad equilibrada (2P-3I o 3P-2I).
+    """
+    jp = results.get("jackpot_analysis", {})
+    if not jp.get("disponible"):
+        return None
+
+    counts = results["main_counts_dict"]
+    atrasos = results["atrasos_dict"]
+    N_draws = results["total_draws"]
+
+    arrastre_pool = jp["ultimo_ganador"]["combinacion"]
+    arrastre_set = set(arrastre_pool)
+    freq_global = jp["frecuencias_global"]
+    freq_tramo = jp["frecuencias_tramo"]
+    max_fg = max(freq_global.values()) if freq_global else 1
+    max_ft = max(freq_tramo.values()) if freq_tramo else 1
+
+    # Pesos de muestreo para completar fuera del arrastre
+    otras_balls = [n for n in range(1, N_BALLS + 1) if n not in arrastre_set]
+    pesos_otras = []
+    for n in otras_balls:
+        score_tramo = freq_tramo.get(n, 0) / max_ft
+        score_glob = freq_global.get(n, 0) / max_fg
+        bonus_cal = 1.25 if n <= 31 else 0.70
+        pesos_otras.append((0.60 * score_tramo + 0.40 * score_glob + 0.25) * bonus_cal)
+    pesos_otras = np.array(pesos_otras, dtype=float)
+    pesos_otras /= pesos_otras.sum()
+
+    # Pesos para elegir 1 o 2 balotas de arrastre
+    pesos_arr = np.array([
+        (freq_tramo.get(n, 0) / max_ft) * 0.5 + (freq_global.get(n, 0) / max_fg) * 0.5 + 0.3
+        for n in arrastre_pool
+    ], dtype=float)
+    pesos_arr /= pesos_arr.sum()
+
+    candidatos = set()
+    # Enumerar sistemáticamente pares/singles de arrastre con top candidatas del tramo
+    top_otras_ordenadas = [
+        n for n, _ in sorted(
+            zip(otras_balls, pesos_otras), key=lambda x: x[1], reverse=True
+        )[:16]
+    ]
+    for k_arr in (1, 2):
+        for arr_pick in combinations(arrastre_pool, k_arr):
+            for rest_pick in combinations(top_otras_ordenadas[:14], 5 - k_arr):
+                comb = tuple(sorted(arr_pick + rest_pick))
+                s = sum(comb)
+                pares = sum(1 for x in comb if x % 2 == 0)
+                menores_31 = sum(1 for x in comb if x <= 31)
+                if 82 <= s <= 104 and pares in (2, 3) and menores_31 >= 4:
+                    candidatos.add(comb)
+
+    # Complementar con muestreo ponderado por si hicieran falta más candidatos
+    intentos = 0
+    while len(candidatos) < 1500 and intentos < 8000:
+        intentos += 1
+        k_arr = 1 if (intentos % 2 == 0) else 2
+        arr_pick = tuple(int(x) for x in np.random.choice(arrastre_pool, size=k_arr, replace=False, p=pesos_arr))
+        rest_pick = tuple(int(x) for x in np.random.choice(otras_balls, size=5 - k_arr, replace=False, p=pesos_otras))
+        comb = tuple(sorted(arr_pick + rest_pick))
+        s = sum(comb)
+        pares = sum(1 for x in comb if x % 2 == 0)
+        menores_31 = sum(1 for x in comb if x <= 31)
+        if 82 <= s <= 104 and pares in (2, 3) and menores_31 >= 4:
+            candidatos.add(comb)
+
+    if not candidatos:
+        # Respaldo relajado manteniendo al menos 1 balota de arrastre
+        for arr_n in arrastre_pool:
+            comb = tuple(sorted([arr_n] + top_otras_ordenadas[:4]))
+            candidatos.add(comb)
+
+    mejor = None
+    mejor_rank = -1.0
+    for c in candidatos:
+        s_freq = calculate_frequency_score_vectorized(c, results["all_balls_flat"], N_draws)
+        p_markov_g = calculate_sequence_probability(c, results["transition_matrix_global"])
+        p_markov_p = calculate_positional_markov_probability(
+            c, results["positional_matrices"], results["last_combination"]
+        )
+        s_gauss = calculate_sum_gaussian_score(c)
+        s_entropy = calculate_shannon_entropy(c)
+        s_bayes = calculate_bayesian_dirichlet_score(c, counts, N_draws, bayes_lookup=results["bayes_lookup"])
+        s_hazard = calculate_weibull_hazard_score(c, atrasos)
+        s_ising = calculate_ising_energy_score(c, results["ising_matrix"])
+
+        score_comp = calculate_composite_score(
+            s_freq, p_markov_g, p_markov_p, s_gauss, s_entropy, s_bayes, s_hazard, s_ising
+        )
+        afinidad_jp = float(np.mean([
+            0.60 * (freq_tramo.get(x, 0) / max_ft) + 0.40 * (freq_global.get(x, 0) / max_fg)
+            for x in c
+        ]))
+        rank_score = 0.65 * (score_comp / 100.0) + 0.35 * afinidad_jp
+
+        if rank_score > mejor_rank:
+            mejor_rank = rank_score
+            pares = sum(1 for x in c if x % 2 == 0)
+            bajos = sum(1 for x in c if x <= LOW_HIGH_SPLIT)
+            arr_inc = sorted(int(x) for x in c if x in arrastre_set)
+            mejor = {
+                "combinacion": [int(x) for x in c],
+                "composite": float(score_comp),
+                "suma": int(sum(c)),
+                "paridad": f"{pares}P - {5 - pares}I",
+                "bajos_altos": f"{bajos}B - {5 - bajos}A",
+                "menores_31": int(sum(1 for x in c if x <= 31)),
+                "arrastre_incluidas": arr_inc,
+                "tramo": jp["tramo_actual_label"],
+                "score_patron": round(rank_score * 100.0, 2),
+                "atraso_prom": round(float(np.mean([atrasos.get(x, 0) for x in c])), 1),
+                "score_bayes": round(float(s_bayes), 3),
+                "score_hazard": round(float(s_hazard), 3),
+                "score_ising": round(float(s_ising), 3),
+            }
+
+    return mejor
 
 
 # =====================================================================
@@ -729,8 +1050,32 @@ def imprimir_reporte_completo(results, recomendadas):
     print(f"   • Distribución Paridad: {results['dist_paridad']}")
     print(f"   • Distribución Bajos/Altos (Split 19): {results['dist_bajos_altos']}")
 
-    # 6. Top 10 Recomendadas
-    print(f"\n🎯 7. TOP 10 COMBINACIONES RECOMENDADAS (Composite Score v3):")
+    # 6. Ciclo del Premio Mayor (5 balotas) y Relación de Sorteos
+    jp = results.get("jackpot_analysis", {})
+    if jp.get("disponible"):
+        ult = jp["ultimo_ganador"]
+        m4 = jp["proximo_mod4"]
+        print(f"\n🏆 7. ANÁLISIS DE CICLO DE PREMIO MAYOR (5 BALOTAS) Y RELACIÓN DE SORTEOS:")
+        print(f"   • Ganadores históricos: {jp['total_ganadores']}/{jp['total_sorteos']} sorteos ({jp['efectividad_pct']}%) | Salto medio: {jp['delta_media']} sorteos (Mediana: {jp['delta_mediana']}, Máx: {jp['delta_max']})")
+        print(f"   • Último ganador: Sorteo #{ult['sorteo']} ({ult['fecha']}) -> {' - '.join(f'{x:02d}' for x in ult['combinacion'])} | Monto: {ult['monto']}")
+        print(f"   • Próximo sorteo (#{jp['proximo_sorteo']}): Salto Δ={jp['delta_actual']} ({jp['tramo_actual_label']}) | Residuo Mod 4={m4['residuo']} ({m4['dia']}: {m4['tasa_pct']}% histórico)")
+        print(f"   • Efecto Réplica: {jp['efecto_replica_detalle']}")
+        print(f"   • Arrastre entre ganadores consecutivos: {jp['arrastre_pct']}% repite ≥1 balota (media {jp['arrastre_media']})")
+        top_t = ", ".join([f"#{x['balota']:02d} ({x['frecuencia']}x)" for x in jp["top_balotas_tramo"][:6]])
+        print(f"   • Top balotas del tramo actual ({jp['tramo_actual_label']}): {top_t}")
+        print("   • Últimos sorteos ganadores de Premio Mayor:")
+        for ug in jp["ultimos_ganadores"][-6:]:
+            delta_txt = f"+{ug['delta_sorteos']}" if ug["delta_sorteos"] is not None else "-"
+            c_ug = " - ".join(f"{x:02d}" for x in ug["combinacion"])
+            print(f"     - #{ug['sorteo']} ({ug['fecha']}, Δ={delta_txt}): {c_ug} -> {ug['monto']}")
+        jplay = results.get("jackpot_play")
+        if jplay:
+            c_jp = " - ".join(f"{x:02d}" for x in jplay["combinacion"])
+            arr_txt = ", ".join(f"{x:02d}" for x in jplay["arrastre_incluidas"])
+            print(f"   • 🎯 Jugada Patrón Premio Mayor: {c_jp} (Score v3: {jplay['composite']}/100 | Suma: {jplay['suma']} | {jplay['paridad']} | ≤31: {jplay['menores_31']}/5 | Arrastre: {arr_txt})")
+
+    # 7/8. Top 10 Recomendadas
+    print(f"\n🎯 8. TOP 10 COMBINACIONES RECOMENDADAS (Composite Score v3):")
     filas = []
     for idx, item in enumerate(recomendadas, 1):
         c_str = " - ".join([f"{x:02d}" for x in item["combinacion"]])
@@ -835,6 +1180,8 @@ def main():
             "suma_stats": results["suma_stats"],
             "dist_paridad": results["dist_paridad"],
             "dist_bajos_altos": results["dist_bajos_altos"],
+            "jackpot_analysis": results.get("jackpot_analysis"),
+            "jackpot_play": results.get("jackpot_play"),
             "recomendadas": recs,
         }
         print(json.dumps(payload, indent=2, ensure_ascii=False, default=lambda x: int(x) if isinstance(x, np.integer) else float(x)))

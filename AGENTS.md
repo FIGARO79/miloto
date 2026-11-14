@@ -13,7 +13,7 @@ Cada vez que se solicite o ejecute el `PRONOSTICO`:
 
 ## Palabra Activadora Rápida (Trigger Keyword)
 * **Palabra Principal:** `PRONOSTICO` (o en minúsculas `pronostico`)
-* **Alias reconocidos:** `JUGADAS`, `MILOTO`
+* **Alias reconocidos:** `JUGADAS`, `MILOTO`, `PREMIO MAYOR`, `PATRON`
 
 Cuando el usuario ingrese la palabra activadora o solicite jugadas/pronósticos para el sorteo:
 1. **Activar de inmediato la skill:** `miloto-analisis-predictivo` (`.agents/skills/miloto-analisis-predictivo/SKILL.md`).
@@ -21,8 +21,8 @@ Cuando el usuario ingrese la palabra activadora o solicite jugadas/pronósticos 
    ```bash
    ./.venv/bin/python .agents/skills/miloto-analisis-predictivo/scripts/ejecutar_pronostico_completo.py
    ```
-3. **Presentar la respuesta con la estructura estandarizada en 4 secciones:**
-   * **Cabecera de Entorno:** Dataset analizado (`miloto.json`), último sorteo jugado, resonancia Lag-8 y régimen dinámico HMM.
+3. **Presentar la respuesta con la estructura estandarizada en 5 secciones:**
+   * **Cabecera de Entorno:** Dataset analizado (`miloto.json`), último sorteo jugado, resonancia Lag-8, régimen dinámico HMM y último sorteo ganador del Premio Mayor ($\Delta$ hacia el próximo sorteo).
    * **1. Pronósticos Recomendados: MiLoto:** Tabla Markdown con Top 5 jugadas (`#`, `Combinación`, `Suma`, `Índice v3`, `Par`, `B/A`, `Gap Prom`, `Bayes`, `Weibull`, `Ising`, `Insignias`).
    * **2. Auditoría Detallada de la Jugada Estrella (#1):** Desglose cualitativo a fondo del Top 1 (Suma Gaussiana, Entropía de Shannon, Bayes Dirichlet, Hazard Rate y Afinidad de Ising).
    * **3. Estrategia Avanzada: Rueda Combinatoria Reducida (Wheeling System):** Bloque de 7 números clave sincronizados con garantía matemática de 3 aciertos en 5 tiquetes ($20.000 COP).
@@ -30,6 +30,10 @@ Cuando el usuario ingrese la palabra activadora o solicite jugadas/pronósticos 
      * **Perfil A (🎯 Recomendado Principal - Máxima Probabilidad):** Jugada Top #1 orientada a alta frecuencia empírica (75% peso JAX/Frecuencias) y suma en rango dorado (~100).
      * **Perfil B (Alternativa de Ruptura por Atraso Extremo):** Jugada con las 5 balotas de mayor retraso histórico sin solapar ninguna del Perfil A.
      * **Presupuesto semanal:** $32.000 COP por semana (4 sorteos semanales: Lunes, Martes, Jueves y Viernes).
+   * **5. Análisis de Ciclo del Premio Mayor (5 Balotas) y Relación de Sorteos:**
+     * Diagnóstico del próximo sorteo (salto $\Delta$ desde la última caída, residuo `Sorteo % 4` y su tasa histórica, estado del Efecto Réplica y balotas de arrastre).
+     * Tabla de los últimos 6 sorteos ganadores de Premio Mayor (`Sorteo`, `Salto Δ`, `Fecha`, `Combinación`, `Monto Ganado`).
+     * **Tiquete Especial — Perfil C (Cazador de Patrón de Premio Mayor):** Jugada optimizada con arrastre del último Premio Mayor, frecuencias del tramo actual, mayoría de balotas $\le 31$ y suma calibrada al rango ganador.
 4. **Idioma:** Todas las respuestas y análisis deben entregarse en español.
 
 ---

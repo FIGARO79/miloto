@@ -17,7 +17,13 @@ if not exist .venv (
 )
 
 call .venv\Scripts\activate
-.venv\Scripts\python miloto.py %*
+if "%~1"=="" (
+    .venv\Scripts\python miloto.py
+    echo.
+    .venv\Scripts\python .agents\skills\miloto-analisis-predictivo\scripts\ejecutar_pronostico_completo.py
+) else (
+    .venv\Scripts\python miloto.py %*
+)
 
 echo.
 echo [INFO] Analisis finalizado.

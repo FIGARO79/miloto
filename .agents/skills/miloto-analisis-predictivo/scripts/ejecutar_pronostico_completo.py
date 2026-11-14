@@ -106,6 +106,8 @@ def main():
     comb_perfil_a = top_1["combinacion"]
     comb_perfil_b = construir_perfil_b(results, comb_perfil_a)
     eval_perfil_b = ml.evaluar_jugada_manual(comb_perfil_b, results)
+    jp = results.get("jackpot_analysis", {})
+    perfil_c = results.get("jackpot_play") or ml.generar_jugada_patron_premio_mayor(results)
 
     if args.json:
         payload = {
@@ -116,6 +118,9 @@ def main():
                 "ultimo_resultado": results["last_combination"],
                 "lag_8": results["lag_8_combination"],
                 "regimen": results["regime_info"],
+                "ultimo_premio_mayor": jp.get("ultimo_ganador") if jp.get("disponible") else None,
+                "proximo_sorteo": jp.get("proximo_sorteo") if jp.get("disponible") else None,
+                "delta_desde_premio_mayor": jp.get("delta_actual") if jp.get("disponible") else None,
             },
             "top_5_recomendadas": recomendadas,
             "auditoria_top1": audit_top1,
@@ -141,6 +146,8 @@ def main():
                     "atraso_promedio": eval_perfil_b["atraso_promedio"],
                 },
             },
+            "analisis_ciclo_premio_mayor": jp,
+            "tiquete_especial_perfil_c": perfil_c,
         }
         print(json.dumps(payload, indent=2, ensure_ascii=False, default=lambda x: int(x) if isinstance(x, np.integer) else float(x)))
         return
@@ -155,6 +162,12 @@ def main():
         print(f"Resonancia Lag-8:  #{results['lag_8_sorteo']} -> " + " - ".join(f"{x:02d}" for x in results["lag_8_combination"]))
     reg = results["regime_info"]
     print(f"Régimen Estocástico: {reg['regimen_actual']} (Media sumas rec.: {reg['media_reciente_sumas']})")
+    if jp.get("disponible"):
+        ult = jp["ultimo_ganador"]
+        print(
+            f"Último Premio Mayor: #{ult['sorteo']} ({ult['fecha']}) -> {ult['monto']} | "
+            f"Transcurridos hacia #{jp['proximo_sorteo']}: Δ={jp['delta_actual']} sorteo(s)"
+        )
     print("--------------------------------------------------------------------------\n")
 
     # 1. Tabla Top 5
@@ -202,7 +215,39 @@ def main():
     print(f"* **Jugada:** `{b_str}` (Suma: {eval_perfil_b['suma']}, {eval_perfil_b['paridad']}, Atraso Promedio: {eval_perfil_b['atraso_promedio']} sorteos)")
     print("  *Enfocado en números fríos de alto retraso sin repetir ninguna balota del Tiquete 1 (búsqueda de reversión a la media).*\n")
 
-    print("📌 **Presupuesto Sugerido:** 4 sorteos semanales x $8.000 COP = **$32.000 COP por semana**.")
+    print("📌 **Presupuesto Sugerido:** 4 sorteos semanales x $8.000 COP = **$32.000 COP por semana**.\n")
+
+    # 5. Análisis de Ciclo del Premio Mayor (5 Balotas) y Relación de Sorteos
+    if jp.get("disponible"):
+        ult = jp["ultimo_ganador"]
+        m4 = jp["proximo_mod4"]
+        arr_pool_str = " - ".join(f"{x:02d}" for x in ult["combinacion"])
+        print("### 5. Análisis de Ciclo del Premio Mayor (5 Balotas) y Relación de Sorteos\n")
+        print(f"* **Diagnóstico del próximo sorteo (`#{jp['proximo_sorteo']}`):**")
+        print(f"  * **Salto actual (Δ):** `+{jp['delta_actual']}` sorteo(s) desde `#{ult['sorteo']}` ({jp['tramo_actual_label']}; media histórica `{jp['delta_media']}` / mediana `{jp['delta_mediana']}`).")
+        print(f"  * **Módulo 4 (`{jp['proximo_sorteo']} % 4 = {m4['residuo']}`):** Día **{m4['dia']}** (tasa histórica de caída: **`{m4['tasa_pct']}%`** en {m4['ganadores']}/{m4['sorteos']} sorteos).")
+        print(f"  * **Efecto Réplica:** {jp['efecto_replica_detalle']}.")
+        print(f"  * **Arrastre del último ganador (`#{ult['sorteo']}`):** `{arr_pool_str}` (en el **`{jp['arrastre_pct']}%`** de caídas se repite ≥ 1 balota).\n")
+
+        print("| Sorteo | Salto Δ | Fecha | Combinación | Monto Ganado |")
+        print("|:---:|:---:|:---:|:---|:---|")
+        for ug in jp["ultimos_ganadores"][-6:]:
+            d_txt = f"+{ug['delta_sorteos']}" if ug["delta_sorteos"] is not None else "-"
+            c_ug = " - ".join(f"{x:02d}" for x in ug["combinacion"])
+            print(f"| **#{ug['sorteo']}** | `{d_txt}` | {ug['fecha']} | `{c_ug}` | {ug['monto']} |")
+        print()
+
+        if perfil_c:
+            c_str = "-".join(f"{x:02d}" for x in perfil_c["combinacion"])
+            arr_inc_str = ", ".join(f"{x:02d}" for x in perfil_c["arrastre_incluidas"])
+            print("#### 🏆 Tiquete Especial — Perfil C (Cazador de Patrón de Premio Mayor):")
+            print(
+                f"* **Jugada:** `{c_str}` (Score v3: **{perfil_c['composite']}**/100 | "
+                f"Suma: {perfil_c['suma']} | {perfil_c['paridad']} | "
+                f"Balotas ≤ 31: {perfil_c['menores_31']}/5 | Arrastre incluidas: `{arr_inc_str}`)"
+            )
+            print("  *Optimizada con arrastre del último Premio Mayor, frecuencias del tramo actual y rango de suma donde históricamente caen las 5 balotas.*\n")
+
     print("==========================================================================")
 
 

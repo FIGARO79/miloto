@@ -1,8 +1,8 @@
 ---
 name: miloto-analisis-predictivo
 description: >-
-  Use this skill when the user wants to analyze, evaluate, audit, or generate lottery combinations for MiLoto (Baloto Colombia) using the 7-dimension statistical engine (Frequencies, Markov chains, Gaussian sum, Bayesian Dirichlet, Weibull Hazard rate, Ising energy, Shannon entropy), or when optimizing investment capital (bankroll management) with reduced wheels.
-  Palabras activadoras: PRONOSTICO, JUGADAS, MILOTO.
+  Use this skill when the user wants to analyze, evaluate, audit, or generate lottery combinations for MiLoto (Baloto Colombia) using the 7-dimension statistical engine (Frequencies, Markov chains, Gaussian sum, Bayesian Dirichlet, Weibull Hazard rate, Ising energy, Shannon entropy) and the 5-ball jackpot cycle pattern analyzer, or when optimizing investment capital (bankroll management) with reduced wheels.
+  Palabras activadoras: PRONOSTICO, JUGADAS, MILOTO, PREMIO MAYOR, PATRON.
 ---
 
 # Análisis Predictivo y Optimización de Inversión (MiLoto)
@@ -14,9 +14,9 @@ Esta skill proporciona las herramientas y procedimientos automatizados para audi
 ## ⚡ Palabra Activadora Rápida (Trigger)
 
 Cuando el usuario ingrese la palabra activadora:
-* **`PRONOSTICO`** (o sus alias **`JUGADAS`**, **`MILOTO`**)
+* **`PRONOSTICO`** (o sus alias **`JUGADAS`**, **`MILOTO`**, **`PREMIO MAYOR`**, **`PATRON`**)
 
-El agente debe ejecutar de inmediato el flujo de pronóstico completo estandarizado y presentar el reporte estructurado en 4 secciones, asumiendo su rol como **Consejero y Analista Profesional de Inversión**.
+El agente debe ejecutar de inmediato el flujo de pronóstico completo estandarizado y presentar el reporte estructurado en 5 secciones (incluyendo el Análisis de Ciclo del Premio Mayor y el Tiquete Especial Perfil C), asumiendo su rol como **Consejero y Analista Profesional de Inversión**.
 
 ### 🏛️ Los 3 Pilares Permanentes del Consejero
 1. **Auditoría de Brechas:** Desglosar rigurosamente tanto el Top por Momentum (Perfil A) como la Alternativa por Atraso Extremo (Perfil B) bajo el modelo Weibull.
